@@ -1,0 +1,92 @@
+@startuml sequence-checkout
+title Sơ đồ Sequence Diagram (Mức Đặc tả) - UC-05: Đặt và thanh toán đơn hàng
+
+autonumber
+skinparam Style StrictUML
+skinparam SequenceMessageAlignment left
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+
+' 1. Khai báo 5 Lifelines tối thiểu theo kiến trúc BCE & Yêu cầu bài tập
+actor "Customer\n(Khách hàng)" as Customer
+boundary "Next.js UI\n(Boundary)" as UI
+control "NestJS API\n(Control)" as API
+database "Database\n(Entity)" as DB
+control "Payment Service\n(External)" as PAY
+
+== Phase 1: Tạo đơn hàng (Create Order) ==
+Customer -> UI: Chọn sản phẩm & nhấn "Đặt hàng"
+activate UI
+UI -> API: POST /orders\n(Header: Bearer JWT, Body: danh sách món)
+activate API
+
+note over API: **Kiểm tra JWT & Validate dữ liệu**\n- Token hợp lệ & chưa hết hạn?\n- Cấu trúc đơn hàng hợp lệ?
+alt Token không hợp lệ / Chưa đăng nhập
+    API --> UI: 401 Unauthorized
+    UI --> Customer: Yêu cầu đăng nhập tài khoản
+else Token hợp lệ & Dữ liệu đúng
+    group Transaction: Tạo đơn & Trừ tồn kho
+        API -> DB: Kiểm tra & trừ tồn kho sản phẩm (stock >= qty)
+        alt Hết hàng / Tồn kho không đủ
+            DB --> API: Không đủ số lượng tồn kho
+            API --> UI: 409 Conflict (Hết hàng)
+            UI --> Customer: Thông báo sản phẩm hết hàng
+        else Đủ tồn kho
+            API -> DB: Lưu đơn hàng mới (Status: PENDING)
+            DB --> API: Xác nhận lưu đơn thành công (Trả về orderId)
+            API --> UI: 201 Created (orderId, totalAmount, status: PENDING)
+            deactivate API
+            UI --> Customer: Hiển thị giao diện chọn phương thức thanh toán
+        end
+    end
+end
+
+== Phase 2: Khởi tạo thanh toán & Kiểm tra Idempotency ==
+Customer -> UI: Chọn phương thức (Ví/Thẻ) & nhấn "Thanh toán"
+UI -> API: POST /payments\n(Header: Bearer JWT, Idempotency-Key, orderId, method)
+activate API
+
+note over API: **Kiểm tra Idempotency-Key**\nTránh xử lý lặp lại nếu client gửi trùng request
+API -> DB: Kiểm tra Idempotency-Key trong CSDL
+
+alt Idempotency-Key đã tồn tại (Gửi lại yêu cầu thanh toán)
+    DB --> API: Trả về giao dịch thanh toán đã tạo trước đó
+    API --> UI: 200 OK (Payment info cũ, status: PENDING)
+    note right of API: Trả lại kết quả đã có,\nkhông tạo giao dịch thứ 2
+else Key hợp lệ & Mới
+    API -> DB: Lưu giao dịch thanh toán (Status: PENDING)
+    DB --> API: Xác nhận tạo giao dịch thành công
+    API --> UI: 201 Created (paymentId, status: PENDING)
+end
+deactivate API
+
+== Phase 3: Xác nhận thanh toán & Thông báo kết quả ==
+UI -> API: POST /payments/:id/confirm\n(Header: Bearer JWT, Body: { success })
+activate API
+
+API -> PAY: Gửi yêu cầu xác thực giao dịch mô phỏng
+activate PAY
+PAY --> API: Phản hồi kết quả thanh toán (Thành công / Thất bại)
+deactivate PAY
+
+alt Nhánh Alt 1: Thanh toán thành công (success = true)
+    group Transaction: Cập nhật đơn & Tích điểm
+        API -> DB: Cập nhật Payment status = PAID & Order status = PAID
+        API -> DB: Cộng điểm thưởng Loyalty cho người dùng
+        DB --> API: Hoàn tất cập nhật CSDL
+    end
+    API --> UI: 200 OK (status: PAID, pointsEarned)
+    UI --> Customer: Thông báo đặt hàng thành công & Chuyển màn hình xác nhận đơn
+
+else Nhánh Alt 2: Thanh toán thất bại (success = false)
+    group Transaction: Cập nhật trạng thái thất bại
+        API -> DB: Cập nhật Payment status = FAILED & Order status = PAYMENT_FAILED
+        DB --> API: Hoàn tất cập nhật CSDL
+    end
+    API --> UI: 400 Bad Request / 200 OK (status: PAYMENT_FAILED)
+    UI --> Customer: Thông báo thanh toán thất bại, giữ nguyên giỏ hàng & hiện nút "Thử lại"
+end
+deactivate API
+deactivate UI
+
+@enduml

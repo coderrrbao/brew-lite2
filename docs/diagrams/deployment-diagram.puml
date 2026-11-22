@@ -1,0 +1,83 @@
+@startuml
+title Deployment diagram – BrewLite (Production)
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam nodeBackgroundColor White
+skinparam rectangle {
+  BorderStyle dashed
+  BorderThickness 2
+}
+
+cloud "NGƯỜI DÙNG (Internet)" as users {
+  node "Smartphone / PC" <<device>> as device {
+    artifact "Trình duyệt\n(PWA: chưa triển khai)" as browser
+  }
+}
+
+rectangle "LOCAL" as local #EEF7EE {
+  node "Máy lập trình viên" <<device>> as dev {
+    artifact "Docker Compose\nfrontend :3000 → backend :4000\ndb :5432 + volume pgdata" as compose
+  }
+}
+note bottom of dev
+  Env: .env (từ .env.example)
+  Health: compose healthcheck
+  Log: docker compose logs
+end note
+
+rectangle "CI (GitHub)" as ci #EAF2FD {
+  node "GitHub Actions" <<execution environment>> as gha {
+    artifact "ci · docker-ci · cd" as wf
+  }
+  node "GHCR (ghcr.io)" <<container registry>> as ghcr {
+    artifact "brewlite-backend:latest\nbrewlite-frontend:latest" as images
+  }
+}
+note bottom of gha
+  Secrets: SUPABASE_DIRECT_URL,
+  RENDER_DEPLOY_HOOK
+  Health: smoke test sau deploy
+  Log: Actions run logs
+end note
+
+rectangle "PRODUCTION" as prod #FFF4E5 {
+  node "Vercel" <<CDN + execution environment>> as vercel {
+    artifact "Next.js frontend\nHTTPS 443" as next
+  }
+  node "Render – Web Service" <<container>> as render {
+    artifact "NestJS API (Docker)\ncổng $PORT (4000)" as api
+  }
+  database "Supabase PostgreSQL\n(persistent storage)" as pg
+}
+note bottom of vercel
+  Env: NEXT_PUBLIC_API_URL
+  Log: Vercel logs
+end note
+note bottom of render
+  Env/Secrets: DATABASE_URL,
+  JWT_*, CORS_ORIGIN
+  Health: GET /products
+  Log: Render logs
+end note
+note right of pg
+  Cổng 5432 / 6543 (pooler), TLS
+  Log: Supabase dashboard
+end note
+
+browser --> next : HTTPS 443 (CDN)
+browser --> api : HTTPS 443\nREST + JWT
+next --> api : HTTPS (SSR)
+api --> pg : PostgreSQL over TLS\n(Prisma, DATABASE_URL)
+
+compose ..> wf : git push
+wf --> images : docker push
+wf --> api : Deploy Hook\nHTTPS 443
+wf --> pg : prisma migrate deploy\nTLS 5432
+images ..> api : pull image (?)
+
+legend bottom
+  Nét đứt (?) : cần xác nhận trên dashboard
+  (Render pull image GHCR hay build từ Dockerfile).
+  Chưa có GET /health nên health check dùng /products.
+endlegend
+@enduml
