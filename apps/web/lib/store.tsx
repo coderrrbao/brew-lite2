@@ -196,8 +196,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     async function loadOptions() {
       try {
         const [sizeList, toppingList] = await Promise.all([
-          getSizes().catch(() => []),
-          getToppings().catch(() => []),
+          getSizes(),
+          getToppings(),
         ]);
         if (!active) return;
         setSizes(sizeList);
@@ -221,7 +221,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       try {
-        const user = await getCurrentUser().catch(() => null);
+        const user = await getCurrentUser();
 
         if (!active) return;
 

@@ -7,7 +7,7 @@
     "start": "node dist/main.js",
     "start:dev": "npx nest start --watch",
     "lint": "npx eslint \"src/**/*.ts\" \"prisma/**/*.ts\"",
-    "test": "npx jest --runInBand --passWithNoTests",
+    "test": "npx jest --runInBand",
     "test:watch": "npx jest --watch",
     "test:cov": "npx jest --coverage",
     "db:generate": "npx prisma generate",
