@@ -1,0 +1,18 @@
+flowchart TB
+    REQ(["HTTP Request"])
+    subgraph MOD["Mỗi module NestJS (ví dụ: orders)"]
+        direction TB
+        C["Controller<br/>JWT Guard · DTO Validation (ValidationPipe)"]
+        S["Service<br/>Logic nghiệp vụ · Transaction · Luật chuyển trạng thái"]
+        D["Data Access<br/>PrismaService (Prisma ORM)"]
+    end
+    DB[("PostgreSQL")]
+
+    REQ --> C --> S --> D --> DB
+
+    classDef l1 fill:#dbeafe,stroke:#1d4ed8
+    classDef l2 fill:#dcfce7,stroke:#15803d
+    classDef l3 fill:#fef3c7,stroke:#b45309
+    class C l1
+    class S l2
+    class D l3

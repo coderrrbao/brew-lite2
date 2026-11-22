@@ -1,0 +1,20 @@
+flowchart TB
+    KH["👤 Khách hàng / Nhân viên"]
+
+    subgraph BL["Hệ thống BrewLite (Docker Compose)"]
+        direction TB
+        FE["🖥️ Frontend<br/>[Container: Next.js 15, React 19]<br/>Giao diện mobile-first, SSR"]
+        API["⚙️ Backend API<br/>[Container: NestJS 11 - Modular Monolith]<br/>auth · users · products · toppings · sizes<br/>orders · payments (Mock) · promotions"]
+        DB[("🗄️ PostgreSQL 16<br/>[Container: Database]<br/>Dữ liệu + migration (Prisma)")]
+    end
+
+    KH -->|"HTTPS"| FE
+    FE -->|"REST/JSON + JWT<br/>(NEXT_PUBLIC_API_URL / INTERNAL_API_URL)"| API
+    API -->|"Prisma ORM (transaction)"| DB
+
+    classDef person fill:#08427b,color:#fff
+    classDef cont fill:#438dd5,color:#fff,stroke:#2e6295
+    classDef db fill:#2f6f3e,color:#fff
+    class KH person
+    class FE,API cont
+    class DB db
