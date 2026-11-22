@@ -1,0 +1,155 @@
+---
+title: BrewLite – Domain Class Diagram
+---
+classDiagram
+    direction LR
+
+    class User {
+        +String id
+        +String name [0..1]
+        +String email «unique»
+        +String passwordHash
+        +UserRole role
+        +int loyaltyPoints
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+
+    class Product {
+        +String id
+        +String name
+        +String description
+        +int price
+        +String imageUrl
+        +int stock
+        +int version
+        +ProductCategory category
+        +boolean popular
+        +boolean active
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+
+    class Order {
+        +String id
+        +String promotionCode [0..1]
+        +int pointsSpent
+        +int subTotal
+        +int discountAmount
+        +int total
+        +OrderStatus status
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+
+    class OrderItem {
+        +String id
+        +String name
+        +String imageUrl
+        +String size
+        +String[] toppings
+        +int qty
+        +int unitPrice
+        +int lineTotal
+    }
+
+    class Payment {
+        +String id
+        +String idempotencyKey «unique»
+        +int amount
+        +String method
+        +PaymentStatus status
+        +DateTime createdAt
+    }
+
+    class Promotion {
+        +String code «PK»
+        +String description
+        +PromotionType type
+        +int value
+        +int minimumOrderAmount
+        +int maximumDiscountAmount [0..1]
+        +int pointCost
+        +boolean active
+        +DateTime expiresAt [0..1]
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+
+    class LoyaltyTransaction {
+        +String id
+        +LoyaltyTransactionType type
+        +int points
+        +String promotionCode [0..1]
+        +DateTime createdAt
+    }
+
+    class RedeemedVoucher {
+        +String id
+        +int pointsSpent
+        +DateTime redeemedAt
+    }
+
+    class VoucherUsage {
+        +String id
+        +int discountAmount
+        +DateTime usedAt
+    }
+
+    class UserRole {
+        <<enumeration>>
+        CUSTOMER
+        STAFF
+    }
+    class ProductCategory {
+        <<enumeration>>
+        hot
+        cold
+        specialty
+    }
+    class OrderStatus {
+        <<enumeration>>
+        PENDING
+        PAID
+        PREPARING
+        READY
+        COMPLETED
+        PAYMENT_FAILED
+        CANCELLED
+    }
+    class PaymentStatus {
+        <<enumeration>>
+        PENDING
+        PAID
+        FAILED
+    }
+    class PromotionType {
+        <<enumeration>>
+        PERCENTAGE
+        FIXED_AMOUNT
+    }
+    class LoyaltyTransactionType {
+        <<enumeration>>
+        EARN
+        REDEEM
+    }
+
+    User "0..1" --> "0..*" Order
+    Order "1" *-- "1..*" OrderItem
+    Product "0..1" <-- "0..*" OrderItem
+    Order "1" --> "0..*" Payment
+    Promotion "0..1" <-- "0..*" Order
+    User "1" --> "0..*" LoyaltyTransaction
+    Order "0..1" <-- "0..*" LoyaltyTransaction
+    User "1" --> "0..*" RedeemedVoucher
+    Promotion "1" <-- "0..*" RedeemedVoucher
+    User "1" --> "0..*" VoucherUsage
+    Promotion "1" <-- "0..*" VoucherUsage
+    Order "1" -- "0..1" VoucherUsage
+
+    User ..> UserRole
+    Product ..> ProductCategory
+    Order ..> OrderStatus
+    Payment ..> PaymentStatus
+    Promotion ..> PromotionType
+    LoyaltyTransaction ..> LoyaltyTransactionType

@@ -1,0 +1,16 @@
+flowchart TB
+    KH["👤 Khách hàng<br/>[Person]<br/>Xem menu, đặt và thanh toán đồ uống,<br/>đổi điểm thưởng"]
+    NV["👤 Nhân viên (STAFF)<br/>[Person]<br/>Xử lý đơn: pha chế, giao"]
+    SYS["☕ Hệ thống BrewLite<br/>[Software System]<br/>Đặt đồ uống trực tuyến"]
+    PAY["💳 Cổng thanh toán (mô phỏng)<br/>[External System - Mock]<br/>Giả lập thanh toán thành công / thất bại"]
+
+    KH -->|"Dùng qua trình duyệt di động (HTTPS)"| SYS
+    NV -->|"Quản lý trạng thái đơn (HTTPS)"| SYS
+    SYS -->|"Yêu cầu thanh toán<br/>(Idempotency-Key)"| PAY
+
+    classDef person fill:#08427b,color:#fff,stroke:#052e56
+    classDef system fill:#1168bd,color:#fff,stroke:#0b4884
+    classDef ext fill:#999,color:#fff,stroke:#666
+    class KH,NV person
+    class SYS system
+    class PAY ext
