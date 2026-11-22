@@ -1,0 +1,30 @@
+{
+  "name": "brewlite-root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web",
+    "build:api": "npm run build --prefix apps/api",
+    "build:web": "npm run build --prefix apps/web",
+    "lint": "npm run lint --prefix apps/api && npm run lint --prefix apps/web",
+    "test:api": "npm test --prefix apps/api",
+    "test:integration": "node tests/integration/test-e2e-api.mjs",
+    "test:concurrency": "node tests/integration/test-race-condition.mjs",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx apps/api/prisma/seed.ts",
+    "prisma:studio": "prisma studio"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "dotenv": "^18.0.10",
+    "dotenv-cli": "^11.1.0",
+    "prisma": "7.10.1"
+  }
+}

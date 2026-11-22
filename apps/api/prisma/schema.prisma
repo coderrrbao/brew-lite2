@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProductCategory {
+  hot
+  cold
+  specialty
+}
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PREPARING
+  READY
+  COMPLETED
+  PAYMENT_FAILED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PAID
+  FAILED
+  PENDING
+}
+
+// + LOYALTY
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  name                String?
+  email               String               @unique
+  passwordHash        String
+  role                UserRole             @default(CUSTOMER)
+  loyaltyPoints       Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  orders              Order[]
+  redeemedVouchers    RedeemedVoucher[]
+  voucherUsages       VoucherUsage[]
+  loyaltyTransactions LoyaltyTransaction[] // + LOYALTY
+}
+
+model Product {
+  id          String          @id
+  name        String
+  description String
+  price       Int
+  imageUrl    String
+  stock       Int             @default(0)
+  version     Int             @default(0)
+  category    ProductCategory
+  popular     Boolean         @default(false)
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  orderItems  OrderItem[]
+
+  @@index([category, active])
+}
+
+model Order {
+  id                  String               @id @default(cuid())
+  userId              String?
+  promotionCode       String?
+  pointsSpent         Int                  @default(0)
+  subTotal            Int
+  total               Int
+  discountAmount      Int                  @default(0)
+  status              OrderStatus          @default(PENDING)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  user                User?                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items               OrderItem[]
+  payments            Payment[]
+  loyaltyTransactions LoyaltyTransaction[] // + LOYALTY
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String?
+  name      String
+  imageUrl  String
+  size      String
+  toppings  String[] @default([])
+  qty       Int
+  unitPrice Int
+  lineTotal Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  orderId        String
+  idempotencyKey String        @unique
+  amount         Int
+  method         String
+  status         PaymentStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+}
+
+model Promotion {
+  code                  String            @id
+  description           String
+  type                  PromotionType
+  value                 Int
+  minimumOrderAmount    Int               @default(0)
+  maximumDiscountAmount Int?
+  pointCost             Int               @default(0)
+  active                Boolean           @default(true)
+  expiresAt             DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  redeemedVouchers      RedeemedVoucher[]
+  voucherUsages         VoucherUsage[]
+}
+
+model SizeOption {
+  value    String @id
+  label    String
+  priceAdd Int    @default(0)
+}
+
+model Topping {
+  id     String  @id
+  label  String
+  price  Int
+  active Boolean @default(true)
+}
+
+model RedeemedVoucher {
+  id            String   @id @default(cuid())
+  userId        String
+  promotionCode String
+  pointsSpent   Int
+  redeemedAt    DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promotion Promotion @relation(fields: [promotionCode], references: [code], onDelete: Cascade)
+
+  @@unique([userId, promotionCode])
+  @@index([userId])
+}
+
+model VoucherUsage {
+  id             String   @id @default(cuid())
+  userId         String
+  promotionCode  String
+  orderId        String   @unique
+  discountAmount Int
+  usedAt         DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promotion Promotion @relation(fields: [promotionCode], references: [code], onDelete: Cascade)
+
+  @@index([userId, promotionCode])
+}
+
+// + LOYALTY: nhật ký biến động điểm thưởng (ghi ngầm bởi backend).
+// points > 0: cộng điểm, points < 0: trừ điểm.
+model LoyaltyTransaction {
+  id            String                 @id @default(cuid())
+  userId        String
+  orderId       String?
+  promotionCode String?
+  type          LoyaltyTransactionType
+  points        Int
+  createdAt     DateTime               @default(now())
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([orderId])
+}
