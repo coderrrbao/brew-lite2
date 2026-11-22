@@ -12,14 +12,15 @@
     "build:api": "npm run build --prefix apps/api",
     "build:web": "npm run build --prefix apps/web",
     "lint": "npm run lint --prefix apps/api && npm run lint --prefix apps/web",
+    "test": "npm run test --prefix apps/api --if-present && npm run test --prefix apps/web --if-present",
     "test:api": "npm test --prefix apps/api",
     "test:integration": "node tests/integration/test-e2e-api.mjs",
     "test:concurrency": "node tests/integration/test-race-condition.mjs",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
+    "prisma:generate": "npm run db:generate --prefix apps/api",
+    "prisma:migrate": "npx prisma migrate dev --schema=apps/api/prisma/schema.prisma",
     "prisma:seed": "tsx apps/api/prisma/seed.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "npx prisma studio --schema=apps/api/prisma/schema.prisma"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
