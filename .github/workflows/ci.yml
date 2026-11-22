@@ -4,6 +4,7 @@ on:
   push:
     branches: ['**']
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -40,33 +41,33 @@ jobs:
         run: rm -f package-lock.json && npm install
 
       - name: Generate Prisma client
-        working-directory: backend
+        working-directory: apps/api
         run: npm run db:generate
 
       - name: Push DB Schema
-        working-directory: backend
+        working-directory: apps/api
         env:
           DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
         run: npx prisma db push
 
       - name: Seed Database
-        working-directory: backend
+        working-directory: apps/api
         env:
           DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
         run: npm run db:seed
 
       - name: Lint
-        working-directory: backend
+        working-directory: apps/api
         run: npm run lint
 
       - name: Unit & Integration tests
-        working-directory: backend
+        working-directory: apps/api
         env:
           DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
         run: npm test
 
       - name: Build
-        working-directory: backend
+        working-directory: apps/api
         run: npm run build
 
   frontend:
@@ -85,9 +86,9 @@ jobs:
         run: rm -f package-lock.json && npm install
 
       - name: Type check & Lint
-        working-directory: frontend
+        working-directory: apps/web
         run: npm run lint
 
       - name: Build
-        working-directory: frontend
+        working-directory: apps/web
         run: npm run build
