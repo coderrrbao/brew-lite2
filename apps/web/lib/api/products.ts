@@ -17,6 +17,7 @@ export interface SizeOption {
   label: string;
   priceAdd: number;
 }
+
 export interface Topping {
   id: string;
   label: string;
@@ -40,9 +41,9 @@ export async function getProduct(id: string): Promise<Product | null> {
 }
 
 export async function getSizes(): Promise<SizeOption[]> {
-  return request<SizeOption[]>('/sizes');
+  return request<SizeOption[]>('/sizes').catch(() => []);
 }
 
 export async function getToppings(): Promise<Topping[]> {
-  return request<Topping[]>('/toppings');
+  return request<Topping[]>('/toppings').catch(() => []);
 }

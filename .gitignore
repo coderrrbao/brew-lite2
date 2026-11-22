@@ -20,9 +20,3 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
-
-# test outputs
-playwright-report/
-test-results/
-coverage/
-.next/

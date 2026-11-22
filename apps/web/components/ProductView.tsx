@@ -46,7 +46,7 @@ export default function ProductView({ product }: { product: Product | null }) {
         if (!active) return;
         setSizes(sizeList);
         setToppings(toppingList);
-        if (sizeList.length > 0 && !sizeList.some((s) => s.value === "M")) {
+        if (sizeList.length > 0 && !sizeList.some((s: SizeOption) => s.value === "M")) {
           setSize(sizeList[0].value);
         }
       } catch (error) {

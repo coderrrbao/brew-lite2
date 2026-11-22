@@ -16,14 +16,13 @@
     "test:api": "npm test --prefix apps/api",
     "test:integration": "node tests/integration/test-e2e-api.mjs",
     "test:concurrency": "node tests/integration/test-race-condition.mjs",
-    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "prisma:generate": "npm run db:generate --prefix apps/api",
     "prisma:migrate": "npx prisma migrate dev --schema=apps/api/prisma/schema.prisma",
     "prisma:seed": "tsx apps/api/prisma/seed.ts",
-    "prisma:studio": "npx prisma studio --schema=apps/api/prisma/schema.prisma"
+    "prisma:studio": "npx prisma studio --schema=apps/api/prisma/schema.prisma",
+    "test:db": "node tests/integration/test-db.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
     "dotenv": "^18.0.10",
     "dotenv-cli": "^11.1.0",
     "prisma": "7.10.1"
