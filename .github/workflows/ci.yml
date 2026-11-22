@@ -1,0 +1,93 @@
+name: BrewLite CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: BrewLite_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: rm -f package-lock.json && npm install
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run db:generate
+
+      - name: Push DB Schema
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
+        run: npx prisma db push
+
+      - name: Seed Database
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
+        run: npm run db:seed
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Unit & Integration tests
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
+        run: npm test
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+  frontend:
+    name: Frontend quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: rm -f package-lock.json && npm install
+
+      - name: Type check & Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
