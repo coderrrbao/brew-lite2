@@ -83,11 +83,11 @@ async function goToCheckoutAsGuestThenLogin(page: Page, user: { name: string; em
 async function startPayment(page: Page) {
   await page.getByRole('radio', { name: /Ví MoMo/ }).click();
   await page.getByRole('button', { name: /Xác nhận thanh toán/ }).click();
-  // Tạo đơn thành công → hiện màn hình quét mã (mock) với mã đơn
+  
   await expect(page.getByText('Quét mã để thanh toán')).toBeVisible();
-  await expect(page.getByText(/^Mã đơn:/)).toBeVisible();
+  
+  await expect(page.locator('p', { hasText: /^Mã đơn:/ })).toBeVisible();
 }
-
 test.describe('E2E – Đặt và thanh toán đơn hàng (UC-01)', () => {
   test('happy path: menu → size/topping → giỏ → đăng ký → thanh toán → xác nhận → lịch sử', async ({
     page,
