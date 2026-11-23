@@ -20,7 +20,9 @@
     "prisma:migrate": "npx prisma migrate dev --schema=apps/api/prisma/schema.prisma",
     "prisma:seed": "tsx apps/api/prisma/seed.ts",
     "prisma:studio": "npx prisma studio --schema=apps/api/prisma/schema.prisma",
-    "test:db": "node tests/integration/test-db.mjs"
+    "test:db": "node tests/integration/test-db.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
   },
   "devDependencies": {
     "dotenv": "^18.0.10",
