@@ -11,8 +11,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/brewlite-backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/brewlite-frontend
+  API_IMAGE: ghcr.io/${{ github.repository_owner }}/brewlite-api
+  WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/brewlite-web
 
 jobs:
   docker-build-and-test:
@@ -35,48 +35,63 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push Backend Image
+      # 1. Build Image API (NestJS)
+      - name: Build API Image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
-          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
           load: true
-          tags: ${{ env.BACKEND_IMAGE }}:latest
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
+          tags: ${{ env.API_IMAGE }}:latest
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
 
-      - name: Build & Push Frontend Image
+      # 2. Build Image Web (Next.js)
+      - name: Build Web Image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
-          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
           load: true
           build-args: |
             NEXT_PUBLIC_API_URL=http://localhost:4000
-          tags: ${{ env.FRONTEND_IMAGE }}:latest
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+          tags: ${{ env.WEB_IMAGE }}:latest
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
-      - name: Start Compose & Verify Healthchecks
+      # 3. Khởi chạy Docker Compose & Verify Healthcheck
+      - name: Start Compose & Verify Health
         env:
-          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
-          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          API_IMAGE: ${{ env.API_IMAGE }}
+          WEB_IMAGE: ${{ env.WEB_IMAGE }}
           IMAGE_TAG: latest
           JWT_SECRET: ci-test-secret-key
+          JWT_ACCESS_SECRET: ci-test-access-secret
+          JWT_REFRESH_SECRET: ci-test-refresh-secret
         run: |
-          docker compose up -d db
-          sleep 5
-          docker compose run --rm backend npx prisma migrate deploy
-          docker compose up -d --wait
+          # Bật toàn bộ stack (api sẽ tự động chờ DB, tự migrate & seed qua entrypoint)
+          docker compose up -d --wait --wait-timeout 60
 
+          # Trạng thái các container
           docker compose ps
-          curl -f http://localhost:4000/products
+
+          # Verify HTTP Endpoints
+          curl -f http://localhost:4000/health
           curl -f http://localhost:3000
 
+      # 4. Push Image lên GHCR (Chỉ chạy trên nhánh main sau khi test pass)
+      - name: Push Images to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          docker push ${{ env.API_IMAGE }}:latest
+          docker push ${{ env.WEB_IMAGE }}:latest
+
+      # 5. In Log nếu có bước bị thất bại
       - name: Show logs on failure
         if: failure()
         run: docker compose logs
 
+      # 6. Dọn dẹp tài nguyên
       - name: Clean up containers
         if: always()
         run: docker compose down -v
