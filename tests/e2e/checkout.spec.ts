@@ -83,10 +83,16 @@ async function goToCheckoutAsGuestThenLogin(page: Page, user: { name: string; em
 async function startPayment(page: Page) {
   await page.getByRole('radio', { name: /Ví MoMo/ }).click();
   await page.getByRole('button', { name: /Xác nhận thanh toán/ }).click();
-  
+
   await expect(page.getByText('Quét mã để thanh toán')).toBeVisible();
-  
-  await expect(page.locator('p', { hasText: /^Mã đơn:/ })).toBeVisible();
+
+  // Khối QR chứa cả nút giả lập → dùng nó làm mốc để lấy đúng dòng "Mã đơn"
+  const qrBlock = page
+    .locator('div')
+    .filter({ has: page.getByRole('button', { name: 'Giả lập thành công' }) })
+    .filter({ hasText: 'Quét mã để thanh toán' })
+    .last();
+  await expect(qrBlock.getByText(/^Mã đơn:/)).toBeVisible();
 }
 test.describe('E2E – Đặt và thanh toán đơn hàng (UC-01)', () => {
   test('happy path: menu → size/topping → giỏ → đăng ký → thanh toán → xác nhận → lịch sử', async ({
