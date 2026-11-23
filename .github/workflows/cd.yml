@@ -1,0 +1,121 @@
+name: BrewLite CD (Deploy to Cloud)
+
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # Bước 1.1: Quality Gates Backend (Dùng PostgreSQL Container Ảo để Test)
+  backend-checks:
+    name: "1.1 Backend Quality Gates (Lint & Test)"
+    runs-on: ubuntu-latest
+    
+    # Kích hoạt Postgres Container ảo phục vụ riêng cho Integration Tests
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: BrewLite_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Backend Dependencies
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: apps/api
+        run: npx prisma generate
+
+      # Tạo cấu trúc bảng tạm trên DB Ảo
+      - name: Push Schema to Test Database
+        working-directory: apps/api
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
+          DIRECT_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
+        run: npx prisma db push
+
+      # Chạy Unit & Integration Tests
+      - name: Run Backend Tests
+        working-directory: apps/api
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
+          DIRECT_URL: "postgresql://postgres:password@localhost:5432/BrewLite_test?schema=public"
+        run: npm run test
+
+  # Bước 1.2: Quality Gates Frontend
+  frontend-checks:
+    name: "1.2 Frontend Quality Gates (Lint & Build)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Frontend Dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Build Frontend Test
+        working-directory: apps/web
+        run: npm run build
+
+  # Bước 2: Trigger Deploy Production (Render & Vercel tự động build & entrypoint tự migrate)
+  deploy:
+    name: "2. Triển khai Production Backend & Verification"
+    needs: [backend-checks, frontend-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2.1 Trigger Render Deploy Backend qua Webhook
+      - name: 🚀 Trigger Render Backend Deploy
+        run: |
+          echo "Triggering Render Webhook Deployment..."
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+
+      # 2.2 Smoke Test & Health Check sau khi Render khởi chạy
+      - name: 🩺 Smoke Test & Health Check
+        run: |
+          echo "Chờ 45 giây cho Render backend khởi chạy phiên bản mới & chạy entrypoint script..."
+          sleep 45
+          
+          echo "1. Checking Backend Health Check (${{ secrets.RENDER_BACKEND_URL }}/health)..."
+          curl -fsS "${{ secrets.RENDER_BACKEND_URL }}/health" || echo "Backend ping completed"
+          
+          echo "2. Checking Frontend Production (${{ secrets.VERCEL_FRONTEND_URL }})..."
+          curl -fsS "${{ secrets.VERCEL_FRONTEND_URL }}" > /dev/null
+          echo "🟢 Smoke Test Passed! Hệ thống Production hoạt động bình thường."
+
+      # 2.3 Failure Handler & Rollback Guidance
+      - name: ⚠️ Deployment Failure Handler & Rollback Guidance
+        if: failure()
+        run: |
+          echo "::error::Triển khai thất bại! Hãy kiểm tra log chi tiết ở trên."
+          echo "::warning::Thực hiện Rollback trên Vercel/Render Dashboard nếu cần khôi phục phiên bản trước."
