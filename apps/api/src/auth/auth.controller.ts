@@ -1,3 +1,4 @@
+const broken_syntax_test === ;
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshDto, RegisterDto } from './dto/auth.dto';
