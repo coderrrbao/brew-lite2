@@ -3,14 +3,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AuthService } from './auth.service';
+import { AuthService, BCRYPT_ROUNDS } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { RefreshTokensService } from './refresh-tokens.service';
 
 jest.mock('bcryptjs', () => ({
   hash: jest.fn(),
   compare: jest.fn(),
-  hashSync: jest.fn(() => '$2a$12$dummy'),
+  hashSync: jest.fn(() => '$2a$10$dummy'),
 }));
 
 describe('AuthService', () => {
@@ -70,7 +70,7 @@ describe('AuthService', () => {
   describe('register', () => {
     it('băm mật khẩu, tạo người dùng và trả về cặp token', async () => {
       const bcrypt = jest.requireMock('bcryptjs');
-      bcrypt.hash.mockResolvedValue('$2a$12$password-hash');
+      bcrypt.hash.mockResolvedValue('$2a$10$password-hash');
       usersMock.create.mockResolvedValue(publicUser);
       jwtMock.signAsync
         .mockResolvedValueOnce('access-token')
@@ -83,11 +83,11 @@ describe('AuthService', () => {
         name: 'Hoang',
       });
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('password123', 12);
+      expect(bcrypt.hash).toHaveBeenCalledWith('password123', BCRYPT_ROUNDS);
       expect(usersMock.create).toHaveBeenCalledWith({
         email: 'hoang@example.com',
         name: 'Hoang',
-        passwordHash: '$2a$12$password-hash',
+        passwordHash: '$2a$10$password-hash',
       });
       expect(result).toEqual({
         accessToken: 'access-token',
@@ -105,7 +105,7 @@ describe('AuthService', () => {
 
     it('ném ConflictException khi email đã tồn tại', async () => {
       const bcrypt = jest.requireMock('bcryptjs');
-      bcrypt.hash.mockResolvedValue('$2a$12$password-hash');
+      bcrypt.hash.mockResolvedValue('$2a$10$password-hash');
       usersMock.create.mockRejectedValue({ code: 'P2002' });
 
       await expect(
@@ -123,7 +123,7 @@ describe('AuthService', () => {
       const bcrypt = jest.requireMock('bcryptjs');
       usersMock.findByEmail.mockResolvedValue({
         ...publicUser,
-        passwordHash: '$2a$12$password-hash',
+        passwordHash: '$2a$10$password-hash',
       });
       bcrypt.compare.mockResolvedValue(true);
       jwtMock.signAsync
@@ -138,7 +138,7 @@ describe('AuthService', () => {
 
       expect(bcrypt.compare).toHaveBeenCalledWith(
         'password123',
-        '$2a$12$password-hash',
+        '$2a$10$password-hash',
       );
       expect(result.user).toEqual(publicUser);
       expect(result).toHaveProperty('accessToken', 'access-token');
@@ -150,7 +150,7 @@ describe('AuthService', () => {
       const bcrypt = jest.requireMock('bcryptjs');
       usersMock.findByEmail.mockResolvedValue({
         ...publicUser,
-        passwordHash: '$2a$12$password-hash',
+        passwordHash: '$2a$10$password-hash',
       });
       bcrypt.compare.mockResolvedValue(false);
 

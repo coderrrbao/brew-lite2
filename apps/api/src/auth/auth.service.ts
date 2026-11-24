@@ -9,9 +9,9 @@ import type { UserDto } from '../users/dto/user.dto';
 import { LoginDto, RefreshDto, RegisterDto } from './dto/auth.dto';
 import { RefreshTokensService } from './refresh-tokens.service';
 
-const BCRYPT_ROUNDS = 12;
+export const BCRYPT_ROUNDS = 8;
 const DUMMY_HASH = hashSync('dummy-password', BCRYPT_ROUNDS);
-const REFRESH_TTL_SECONDS = 24 * 60 * 7;
+const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 type TokenIdentity = Pick<UserDto, 'id' | 'email' | 'role'>;
 export type TokenPair = { accessToken: string; refreshToken: string };
