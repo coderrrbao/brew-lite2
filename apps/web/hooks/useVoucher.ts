@@ -72,6 +72,8 @@ export function useVoucher() {
       setResult(res);
       setAppliedCode(normalized);
       setCode("");
+      // Reload danh sách sau khi áp dụng mã để đảm bảo đồng bộ
+      await getAllPromotions();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -123,5 +125,6 @@ export function useVoucher() {
     checkCode,
     redeemCode,
     reset,
+    refreshPromotions: getAllPromotions,
   };
 }
