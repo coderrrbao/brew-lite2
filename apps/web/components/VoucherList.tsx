@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import type { Promotions, RedeemedVoucher } from "@/lib/api/promotions";
 
 type VoucherCategory = "MY_VOUCHER" | "PROMOTION" | "REDEEMABLE";
+type FilterTab = "ALL" | VoucherCategory;
 
 interface DisplayItem {
   promotion: Promotions;
@@ -105,6 +106,13 @@ type Props = {
   onRedeem: (promotion: Promotions) => void;
 };
 
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: "ALL", label: "Tất cả" },
+  { key: "MY_VOUCHER", label: "Mã của bạn" },
+  { key: "PROMOTION", label: "Khuyến mãi" },
+  { key: "REDEEMABLE", label: "Đổi điểm" },
+];
+
 export default function VoucherList({
   isLoggedIn,
   loyaltyPoints,
@@ -118,9 +126,13 @@ export default function VoucherList({
   onRedeem,
 }: Props) {
   const [openModal, setOpenModal] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("ALL");
 
   useEffect(() => {
-    if (!openModal) return;
+    if (!openModal) {
+      setActiveFilter("ALL");
+      return;
+    }
 
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -179,6 +191,16 @@ export default function VoucherList({
   })();
 
   const hasMore = items.length > PREVIEW_LIMIT;
+
+  // Items đã lọc theo tab (chỉ dùng trong modal)
+  const filteredItems =
+    activeFilter === "ALL"
+      ? items
+      : items.filter((i) => i.category === activeFilter);
+
+  // Chỉ hiện tab khi có ít nhất 2 loại khác nhau
+  const availableCategories = new Set(items.map((i) => i.category));
+  const showFilterTabs = availableCategories.size > 1;
 
   const renderVoucherCard = (
     { promotion: p, category, shortBy }: DisplayItem,
@@ -430,14 +452,48 @@ export default function VoucherList({
 
               {/* Modal Body */}
               <div className="flex-1 overflow-y-auto px-5 py-3.5">
-                <ul className="space-y-2.5">
-                  {items.map((item) =>
-                    renderVoucherCard(item, {
-                      compact: false,
-                      closeAfterPick: true,
-                    }),
-                  )}
-                </ul>
+                {/* Filter Tabs */}
+                {showFilterTabs && (
+                  <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+                    {FILTER_TABS.filter(
+                      (t) =>
+                        t.key === "ALL" || availableCategories.has(t.key as VoucherCategory),
+                    ).map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setActiveFilter(tab.key)}
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          activeFilter === tab.key
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+                        }`}
+                      >
+                        {tab.label}
+                        {tab.key !== "ALL" && (
+                          <span className="ml-1 opacity-70">
+                            ({items.filter((i) => i.category === tab.key).length})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {filteredItems.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    Không có mã nào trong danh mục này
+                  </p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {filteredItems.map((item) =>
+                      renderVoucherCard(item, {
+                        compact: false,
+                        closeAfterPick: true,
+                      }),
+                    )}
+                  </ul>
+                )}
               </div>
 
               {/* Modal Footer */}
