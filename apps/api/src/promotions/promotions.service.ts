@@ -58,7 +58,6 @@ async findAll(userId?: string) {
   
     const promotions = activePromotions.filter((p) => !usedCodes.has(p.code));
 
-    // 2. Tập mã user đã đổi còn hạn (đã loại mã user đã dùng), kèm full thông tin promotion
     const redeemedVouchers = redeemedList
       .filter((r) => !usedCodes.has(r.promotionCode))
       .map((r) => ({
