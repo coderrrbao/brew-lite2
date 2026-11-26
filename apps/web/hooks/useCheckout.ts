@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/lib/api/auth";
 import { cancelOrder, createOrder, getOrderById, updateOrderStatus } from "@/lib/api/orders";
 import { confirmPayment, createPayment } from "@/lib/api/payments";
 import type { PromotionValidation } from "@/lib/api/promotions";
@@ -150,14 +151,21 @@ export function useCheckout(
         dispatch({ type: "PLACE_ORDER", order: confirmRes.order });
 
         if (state.user) {
-          const earnedPoints = Math.floor(confirmRes.order.total / 1000);
-          dispatch({
-            type: "SET_USER",
-            user: {
-              ...state.user,
-              loyaltyPoints: (state.user.loyaltyPoints ?? 0) + earnedPoints,
-            },
-          });
+          try {
+            const freshUser = await getCurrentUser();
+            if (freshUser) {
+              dispatch({ type: "SET_USER", user: freshUser });
+            }
+          } catch {
+            const earnedPoints = Math.floor(confirmRes.order.total / 1000);
+            dispatch({
+              type: "SET_USER",
+              user: {
+                ...state.user,
+                loyaltyPoints: (state.user.loyaltyPoints ?? 0) + earnedPoints,
+              },
+            });
+          }
         }
 
         if (!existingOrderId) {
