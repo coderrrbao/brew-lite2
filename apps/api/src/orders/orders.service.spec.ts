@@ -41,16 +41,25 @@ const INVALID_TRANSITIONS: Transition[] = ALL_STATUSES.flatMap((from) =>
 
 function createPrismaMock() {
   return {
+    $transaction: jest.fn(),
     order: {
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       updateMany: jest.fn(),
+      create: jest.fn(),
     },
     orderItem: {
       findMany: jest.fn(),
     },
     product: {
+      findMany: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
+    },
+    sizeOption: {
+      findMany: jest.fn(),
+    },
+    topping: {
+      findMany: jest.fn(),
     },
   };
 }
@@ -61,7 +70,49 @@ describe("OrdersService", () => {
 
   beforeEach(() => {
     prisma = createPrismaMock();
-    service = new OrdersService(prisma as never, {} as never, {} as never);
+    service = new OrdersService(prisma as never, {} as never);
+  });
+
+  describe("create", () => {
+    it("does not decrement stock before payment", async () => {
+      const createdOrder = { id: "o1", items: [] };
+      const tx = {
+        product: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: "p1",
+              active: true,
+              price: 100,
+              name: "Drink",
+              imageUrl: "drink.png",
+            },
+          ]),
+          updateMany: jest.fn(),
+        },
+        sizeOption: {
+          findMany: jest.fn().mockResolvedValue([{ value: "M", priceAdd: 0 }]),
+        },
+        topping: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        order: {
+          create: jest.fn().mockResolvedValue(createdOrder),
+        },
+      };
+      prisma.$transaction.mockImplementation(
+        (callback: (transaction: never) => unknown) => callback(tx as never),
+      );
+
+      const result = await service.create(
+        {
+          items: [{ productId: "p1", size: "M", toppings: [], qty: 1 }],
+        },
+        "u1",
+      );
+
+      expect(tx.product.updateMany).not.toHaveBeenCalled();
+      expect(result).toBe(createdOrder);
+    });
   });
 
   // 1. KIỂM TRA MÁY TRẠNG THÁI
@@ -128,6 +179,23 @@ describe("OrdersService", () => {
         data: { status: "PREPARING" },
       });
       expect(result).toBe(updatedOrder);
+    });
+
+    it("hủy đơn PAID và hoàn lại tồn kho", async () => {
+      prisma.order.findUnique.mockResolvedValue({ id: "o1", status: "PAID" });
+      prisma.order.updateMany.mockResolvedValue({ count: 1 });
+      prisma.orderItem.findMany.mockResolvedValue([{ productId: "p1", qty: 2 }]);
+      prisma.order.findUniqueOrThrow.mockResolvedValue({
+        id: "o1",
+        status: "CANCELLED",
+      });
+
+      await service.updateStatus("o1", "CANCELLED");
+
+      expect(prisma.product.update).toHaveBeenCalledWith({
+        where: { id: "p1" },
+        data: { stock: { increment: 2 } },
+      });
     });
 
     it("ném ConflictException khi trạng thái bị đổi bởi request khác", async () => {
@@ -217,17 +285,13 @@ describe("OrdersService", () => {
       expect(result).toBe(updatedOrder);
     });
 
-    it("hủy đơn: chuyển CANCELLED và hoàn lại tồn kho từng sản phẩm", async () => {
+    it("hủy đơn PENDING không hoàn kho vì chưa trừ kho", async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: "o1",
         userId: USER_ID,
         status: "PENDING",
       });
       prisma.order.updateMany.mockResolvedValue({ count: 1 });
-      prisma.orderItem.findMany.mockResolvedValue([
-        { productId: "p1", qty: 2 },
-        { productId: "p2", qty: 1 },
-      ]);
       prisma.order.findUniqueOrThrow.mockResolvedValue({
         id: "o1",
         status: "CANCELLED",
@@ -236,18 +300,8 @@ describe("OrdersService", () => {
 
       await service.updateStatusByUser("o1", "CANCELLED", USER_ID);
 
-      expect(prisma.orderItem.findMany).toHaveBeenCalledWith({
-        where: { orderId: "o1" },
-      });
-      expect(prisma.product.update).toHaveBeenCalledTimes(2);
-      expect(prisma.product.update).toHaveBeenNthCalledWith(1, {
-        where: { id: "p1" },
-        data: { stock: { increment: 2 } },
-      });
-      expect(prisma.product.update).toHaveBeenNthCalledWith(2, {
-        where: { id: "p2" },
-        data: { stock: { increment: 1 } },
-      });
+      expect(prisma.orderItem.findMany).not.toHaveBeenCalled();
+      expect(prisma.product.update).not.toHaveBeenCalled();
     });
 
     it("hủy đơn đã thanh toán (PAID → CANCELLED) cũng hoàn kho", async () => {
@@ -268,26 +322,21 @@ describe("OrdersService", () => {
       });
     });
 
-    it("lỗi khi hoàn kho một sản phẩm không làm hỏng việc hủy đơn", async () => {
+    it("báo lỗi nếu không thể hoàn kho cho đơn đã thanh toán", async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: "o1",
         userId: USER_ID,
-        status: "PENDING",
+        status: "PAID",
       });
       prisma.order.updateMany.mockResolvedValue({ count: 1 });
-      prisma.orderItem.findMany.mockResolvedValue([
-        { productId: "p1", qty: 1 },
-        { productId: "p2", qty: 1 },
-      ]);
-      prisma.product.update
-        .mockRejectedValueOnce(new Error("product deleted"))
-        .mockResolvedValueOnce({});
+      prisma.orderItem.findMany.mockResolvedValue([{ productId: "p1", qty: 1 }]);
+      prisma.product.update.mockRejectedValueOnce(new Error("product deleted"));
       prisma.order.findUniqueOrThrow.mockResolvedValue({ id: "o1" });
 
       await expect(
         service.updateStatusByUser("o1", "CANCELLED", USER_ID),
-      ).resolves.toBeDefined();
-      expect(prisma.product.update).toHaveBeenCalledTimes(2);
+      ).rejects.toThrow("product deleted");
+      expect(prisma.product.update).toHaveBeenCalledTimes(1);
     });
 
     it("không hoàn kho khi trạng thái bị đổi bởi request khác", async () => {
